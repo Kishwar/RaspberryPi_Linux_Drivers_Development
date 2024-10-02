@@ -3,9 +3,17 @@
 
 ## 1. Install Required Packages
 ```bash
-sudo apt install gawk wget git diffstat unzip texinfo gcc build-essential chrpath socat cpio python3 python3-pip python3-pexpect xz-utils debianutils iputils-ping python3-git python3-jinja2 python3-subunit zstd liblz4-tool file locales libacl1
+# Update package repositories
+sudo apt update
+
+# Install packages required for Yocto build
+sudo apt install -y gawk wget git diffstat unzip texinfo gcc build-essential \
+chrpath socat cpio python3 python3-pip python3-pexpect xz-utils debianutils \
+iputils-ping python3-git python3-jinja2 python3-subunit zstd liblz4-tool file \
+locales libacl1 libssl-dev libncurses5-dev u-boot-tools
+
+# Generate locale
 sudo locale-gen en_US.UTF-8
-sudo apt-get install gawk wget git-core diffstat unzip texinfo gcc-multilib build-essential chrpath socat cpio python2 python3 python3-pip python3-pexpect xz-utils debianutils iputils-ping python3-git python3-jinja2 libegl1-mesa libsdl1.2-dev xterm
 ```
 
 ## 2. Download the Poky Sources
@@ -54,11 +62,15 @@ IMAGE_INSTALL_append = " usbutils"
 - Clone the Raspberry Pi meta-layer:
 ```bash
 git clone git://git.yoctoproject.org/meta-raspberrypi
+cd meta-raspberrypi
+git checkout zeus
 ```
 ### Dependencies
 - **meta-openembedded**: Required dependencies for the Raspberry Pi layer.
 ```bash
 git clone git://git.openembedded.org/meta-openembedded
+cd meta-openembedded
+git checkout zeus
 ```
 
 ### Layers Needed:
@@ -69,7 +81,10 @@ git clone git://git.openembedded.org/meta-openembedded
 
 ## 8. Directory Structure After Cloning
 ```plaintext
-meta-openembedded  meta-raspberrypi  poky
+~/embd_linux/
+├── poky
+├── meta-raspberrypi
+└── meta-openembedded
 ```
 
 ## 9. Building the Image
@@ -78,11 +93,36 @@ meta-openembedded  meta-raspberrypi  poky
 source poky/oe-init-build-env build_pi
 ```
 
-2. Add `meta-openembedded` layers (meta-oe, meta-multimedia, meta-networking, meta-python) and the `meta-raspberrypi` layer to `bblayers.conf`.
+2. Add `meta-openembedded` layers (meta-oe, meta-multimedia, meta-networking, meta-python) and the `meta-raspberrypi` layer to `build_pi/conf/bblayers.conf`.
+   ```plaintext
+   BBLAYERS ?= " \
+  ${TOPDIR}/../poky/meta \
+  ${TOPDIR}/../poky/meta-poky \
+  ${TOPDIR}/../meta-openembedded/meta-oe \
+  ${TOPDIR}/../meta-openembedded/meta-multimedia \
+  ${TOPDIR}/../meta-openembedded/meta-networking \
+  ${TOPDIR}/../meta-openembedded/meta-python \
+  ${TOPDIR}/../meta-raspberrypi \
+"
+```
 
-3. Set the MACHINE in `local.conf` to `raspberrypi3`:
-```bash
-echo 'MACHINE = "raspberrypi3"' >> conf/local.conf
+3. Configure local.conf for Raspberry Pi 3: Edit the build_pi/conf/local.conf file to set up the Raspberry Pi and enable UART, SPI, I2C, SSH, and Ethernet:
+```plaintext
+# Set the target machine
+MACHINE = "raspberrypi3"
+
+# Enable UART
+ENABLE_UART = "1"
+
+# Enable SSH server
+EXTRA_IMAGE_FEATURES += " ssh-server-openssh"
+
+# Include Ethernet, SPI, and I2C tools
+IMAGE_INSTALL_append = " i2c-tools spi-tools python3-serial dhcp-client iproute2"
+
+# Add support for systemd
+DISTRO_FEATURES_append = " systemd"
+VIRTUAL-RUNTIME_init_manager = "systemd"
 ```
 
 4. To see available images:
@@ -90,31 +130,23 @@ echo 'MACHINE = "raspberrypi3"' >> conf/local.conf
 ls ../meta-raspberrypi/recipes-*/images/
 ```
 
-## 10. Images Overview
+## 11. Images Overview
 - **rpi-hwup-image.bb**: Based on `core-image-minimal`.
 - **rpi-basic-image.bb**: Based on `rpi-hwup-image.bb` with added features (e.g., splash screen).
 - **rpi-test-image.bb**: Based on `rpi-basic-image.bb`, includes packages from `meta-raspberrypi`.
 
-## 11. Enabling UART
-Raspberry Pi 3 does not have UART enabled by default. To enable it, add the following to `local.conf`:
-
-```plaintext
-ENABLE_UART = "1"
-```
-
-Build the image:
-
+## 12. Build Image:
 ```bash
 bitbake rpi-hwup-image
 ```
 
-## 12. Raspberry Pi Information
+## 13. Raspberry Pi Information
 - **Broadcom BCM2837**
   - **CPU**: 1.2GHz 64-bit quad-core ARMv8 Cortex-A53
   - **GPU**: Broadcom VideoCore IV
   - **SDRAM**: 1024 MiB
 
-## 13. Booting Sequence in Raspberry Pi
+## 14. Booting Sequence in Raspberry Pi
 1. **GPU Core**: First stage bootloader, stored in ROM on the SoC.
 2. **bootcode.bin**
 3. **start.elf**
@@ -122,14 +154,14 @@ bitbake rpi-hwup-image
 5. **cmdline.txt**
 6. **kernel7.img**
 
-## 14. Image Location
+## 15. Image Location
 The built images can be found at:
 
 ```plaintext
 tmp/deploy/images/raspberrypi3
 ```
 
-## 15. IMAGE_ROOTFS_EXTRA_SPACE
+## 16. IMAGE_ROOTFS_EXTRA_SPACE
 This variable adds extra free space to the root filesystem image. The value is specified in kilobytes.
 
 ### Default Value: 0
