@@ -1,5 +1,5 @@
 
-# Yocto and Raspberry Pi Project Setup
+# Yocto and Raspberry Pi Project Setup (WSL2 on Windows 10)
 
 ## 1. Install Required Packages
 ```bash
@@ -10,7 +10,7 @@ sudo apt-get install gawk wget git-core diffstat unzip texinfo gcc-multilib buil
 
 ## 2. Download the Poky Sources
 ```bash
-git clone git://git.yoctoproject.org/poky
+git clone git://git.yoctoproject.org/poky (this really takes time)
 ```
 
 ## 3. Checkout the Latest Branch/Release
