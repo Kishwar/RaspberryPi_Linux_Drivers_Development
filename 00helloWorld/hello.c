@@ -11,7 +11,7 @@ MODULE_DESCRIPTION("HelloWorld linux kernel module (LKM)");
  */
 static int __init ModuleHelloWorldInit(void)
 {
-	printk("Hello, Kernel module (LKM)");
+	printk("Hello, Kernel module (LKM) - KLM loaded on WSL2 Kernel --- Wooohooo ---\n");
 	return 0;
 }
 
@@ -20,7 +20,7 @@ static int __init ModuleHelloWorldInit(void)
  */
 static void __exit ModuleHelloWorldExit(void)
 {
-	printk("Goodbye, Kernel module (LKM)");
+	printk("Goodbye, Kernel module (LKM) -- KLM removed from WSL2 Kernle ----  Hurray!! ----\n");
 }
 
 module_init(ModuleHelloWorldInit);
