@@ -145,3 +145,26 @@ kkumar@DESKTOP-NK9HSKR:~/embd_linux/RaspberryPi_Linux_Drivers_Development/01Char
 [17713.568753] SINGLE_CHAR_DEVICE: executing ModuleCharacterDeviceExit
 [17713.568999] SINGLE_CHAR_DEVICE: ModuleCharacterDeviceExit device cleaned up successfully..
 ```
+
+## Let's prepare enviroment for RaspberryPi (Cross-Compilation)
+
+[RaspberryPi build env setup on WSL2](https://github.com/Kishwar/RaspberryPi_Linux_Drivers_Development/blob/main/README.md)
+
+### 1. Build the Yocto Toolchain for the Raspberry Pi (if not already built)
+```bash
+bitbake meta-toolchain
+```
+
+### 2. Source the Toolchain Environment Script
+After building the toolchain, Yocto will generate a toolchain setup script (e.g., environment-setup-cortexa7t2hf-neon-vfpv4-poky-linux-gnueabi). This script sets up the necessary cross-compilation variables.
+```bash
+source tmp/sysroots/raspberrypi3/imgdata/core-image-minimal.env
+```
+
+### 3. Get the Raspberry Pi Kernel Headers
+You need the kernel headers for your specific Raspberry Pi kernel version. Use the Yocto build system to extract and set up the headers.
+```bash
+
+```
+
+
