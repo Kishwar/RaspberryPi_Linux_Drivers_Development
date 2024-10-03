@@ -51,43 +51,43 @@ struct cdev pcdev;
 /*define global functions*/
 loff_t _lseek(struct file *pfile, loff_t off, int whence)
 {
-	printk("executing %s\n", __func__);
-	return 0;
+  printk("executing %s\n", __func__);
+  return 0;
 }
 
 ssize_t _read(struct file *pfile, char __user *pbuff, size_t count, loff_t *poff)
 {
-	printk("executing %s, requested %zu bytes\n", __func__, count);
-	return 0;
+  printk("executing %s, requested %zu bytes\n", __func__, count);
+  return 0;
 }
 
 ssize_t _write(struct file *pfile, const char __user *pbuff, size_t count, loff_t *poff)
 {
-	printk("executing %s, requested %zu bytes\n", __func__, count);
-	return 0;
+  printk("executing %s, requested %zu bytes\n", __func__, count);
+  return 0;
 }
 
 int _open(struct inode *node, struct file *pfile)
 {
-	printk("executing %s\n", __func__);
-	return 0;
+  printk("executing %s\n", __func__);
+  return 0;
 }
 
 int _release(struct inode *pnode, struct file *pfile)
 {
-	printk("executing %s\n", __func__);
-	return 0;
+  printk("executing %s\n", __func__);
+  return 0;
 }
 
 /*file operations of the driver*/
 struct file_operations pcfops =
 {
-	.open    = _open,
-	.write   = _write,
-	.read    = _read,
-	.llseek  = _lseek,
-	.release = _release,
-	.owner   = THIS_MODULE
+  .open    = _open,
+  .write   = _write,
+  .read    = _read,
+  .llseek  = _lseek,
+  .release = _release,
+  .owner   = THIS_MODULE
 };
 
 struct class *pdclass;
@@ -101,41 +101,41 @@ struct device *pdevice;
  */
 static int __init ModuleCharacterDeviceInit(void)
 {
-	printk("executing %s\n", __func__);
+  printk("executing %s\n", __func__);
 
-	/*1. dynamically allocate a device number (creates device number)*/
-	alloc_chrdev_region(&device_number, 0 /*first minor*/, 1 /*counts*/, "pdevice");
+  /*1. dynamically allocate a device number (creates device number)*/
+  alloc_chrdev_region(&device_number, 0 /*first minor*/, 1 /*counts*/, "pdevice");
 
-	printk("%s device number <major>:<minor> = %d:%d\n", __func__,
-	                                                    MAJOR(device_number),
-																											MINOR(device_number));
+  printk("%s device number <major>:<minor> = %d:%d\n", __func__,
+                                                      MAJOR(device_number),
+                                                      MINOR(device_number));
 
-	/*
-		- The Virtual Filesystem (also known as Virtual Filesystem Switch or VFS) is a
-	    kernel software layer that handles all system calls related to a standard Unix
-		  filesystem. Its main strength is providing a common interface to several kinds
-		  of filesystems.
+  /*
+    - The Virtual Filesystem (also known as Virtual Filesystem Switch or VFS) is a
+      kernel software layer that handles all system calls related to a standard Unix
+      filesystem. Its main strength is providing a common interface to several kinds
+      of filesystems.
 
-		- The Virtual File System (VFS) layer [1] provides a uniform interface for the
-		  kernel to deal with various I/O requests and specifies a standard interface
-		  that each file system must support.
-	*/
+    - The Virtual File System (VFS) layer [1] provides a uniform interface for the
+      kernel to deal with various I/O requests and specifies a standard interface
+      that each file system must support.
+  */
 
-	/*2. initialize the cdev structure with fops*/
-	cdev_init(&pcdev, &pcfops);
+  /*2. initialize the cdev structure with fops*/
+  cdev_init(&pcdev, &pcfops);
 
-	/*3. register a device (cdev structure) with VFS*/
-	pcdev.owner = THIS_MODULE;
-	cdev_add(&pcdev, device_number, 1);
-	
-	/*4. create device class under /sys/class/ */
-	pdclass = class_create(THIS_MODULE, "pdevclass");
+  /*3. register a device (cdev structure) with VFS*/
+  pcdev.owner = THIS_MODULE;
+  cdev_add(&pcdev, device_number, 1);
+  
+  /*4. create device class under /sys/class/ */
+  pdclass = class_create(THIS_MODULE, "pdevclass");
 
-	/*5. populate the sysfs with the device information*/
-	pdevice = device_create(pdclass, NULL, device_number, NULL, "pdev");
+  /*5. populate the sysfs with the device information*/
+  pdevice = device_create(pdclass, NULL, device_number, NULL, "pdev");
 
-	printk("%s device created successfully..\n", __func__);
-	return 0;
+  printk("%s device created successfully..\n", __func__);
+  return 0;
 }
 
 /*
@@ -143,15 +143,15 @@ static int __init ModuleCharacterDeviceInit(void)
  */
 static void __exit ModuleCharacterDeviceExit(void)
 {
-	printk("executing %s\n", __func__);
-	
-	/*cleanup task*/
-	device_destroy(pdclass, device_number);
-	class_destroy(pdclass);
-	cdev_del(&pcdev);
-	unregister_chrdev_region(device_number, 1);
+  printk("executing %s\n", __func__);
+  
+  /*cleanup task*/
+  device_destroy(pdclass, device_number);
+  class_destroy(pdclass);
+  cdev_del(&pcdev);
+  unregister_chrdev_region(device_number, 1);
 
-	printk("%s device cleaned up successfully..\n", __func__);
+  printk("%s device cleaned up successfully..\n", __func__);
 }
 
 module_init(ModuleCharacterDeviceInit);
