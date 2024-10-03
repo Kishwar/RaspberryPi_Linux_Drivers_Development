@@ -176,7 +176,11 @@ static int __init ModuleCharacterDeviceInit(void)
   pr_info("%s: executing %s\n", MODULE_NAME, __func__);
 
   /*1. dynamically allocate a device number (creates device number)*/
-  alloc_chrdev_region(&device_number, 0 /*first minor*/, 1 /*counts*/, "pdevice");
+  if(alloc_chrdev_region(&device_number, 0 /*first minor*/, 1 /*counts*/, "pdevice") < 0)
+  {
+    pr_err("%s: %s Failed to allocate a major number\n", MODULE_NAME, __func__);
+    return -1;
+  }
 
   pr_info("%s: %s device number <major>:<minor> = %d:%d\n", MODULE_NAME, __func__,
                                                       MAJOR(device_number),
@@ -192,19 +196,39 @@ static int __init ModuleCharacterDeviceInit(void)
       kernel to deal with various I/O requests and specifies a standard interface
       that each file system must support.
   */
-
-  /*2. initialize the cdev structure with fops*/
-  cdev_init(&pcdev, &pcfops);
-
-  /*3. register a device (cdev structure) with VFS*/
-  pcdev.owner = THIS_MODULE;
-  cdev_add(&pcdev, device_number, 1);
-  
-  /*4. create device class under /sys/class/ */
+ 
+  /*2. create device class under /sys/class/ */
   pdclass = class_create(THIS_MODULE, "pdevclass");
+  if (IS_ERR(pdclass))
+  {
+    unregister_chrdev_region(device_number, 1);
+    pr_err("%s: %s Failed to register device class\n", MODULE_NAME, __func__);
+    return PTR_ERR(pdclass);
+  }
 
-  /*5. populate the sysfs with the device information*/
+  /*3. Create the device file in /dev and set the permissions to 0666 */
   pdevice = device_create(pdclass, NULL, device_number, NULL, "pdev");
+  if(pdevice == NULL)
+  {
+    class_destroy(pdclass);
+    unregister_chrdev_region(device_number, 1);
+    pr_err("%s: %s Failed to create the device\n", MODULE_NAME, __func__);
+    return -1;
+  }
+
+  /*4. Initialize the character device and add it to the system*/
+  cdev_init(&pcdev, &pcfops);
+  pcdev.owner = THIS_MODULE;
+
+  /*5. register a device (cdev structure) with VFS*/  
+  if(cdev_add(&pcdev, device_number, 1) < 0)
+  {
+    device_destroy(pdclass, device_number);
+    class_destroy(pdclass);
+    unregister_chrdev_region(device_number, 1);
+    pr_err("%s: %s Failed to add the cdev\n", MODULE_NAME, __func__);
+    return -1;
+  }
 
   pr_info("%s: %s device created successfully..\n", MODULE_NAME, __func__);
   return 0;
