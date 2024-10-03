@@ -37,6 +37,8 @@ MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Kishwar Kumar");
 MODULE_DESCRIPTION("This is a basic Linux kernel pseudo character device driver.");
 
+#define MODULE_NAME "SINGLE_CHAR_DEVICE"
+
 /* lets create a memory buffer on which we will do operations */
 #define PSEUDO_DEVICE_MEMORY_BUFFER 512
 char pseudo_device_buffer[PSEUDO_DEVICE_MEMORY_BUFFER];
@@ -51,31 +53,101 @@ struct cdev pcdev;
 /*define global functions*/
 loff_t _lseek(struct file *pfile, loff_t off, int whence)
 {
-  printk("executing %s\n", __func__);
-  return 0;
+  loff_t cursor;
+  pr_info("%s: executing %s\n", MODULE_NAME, __func__);
+
+  switch(whence)
+  {
+    case SEEK_SET:
+      if((off > PSEUDO_DEVICE_MEMORY_BUFFER) || (off < 0)) return -EINVAL;
+      pfile->f_pos = off;
+      break;
+    case SEEK_CUR:
+      cursor = pfile->f_pos + off;
+      if((cursor > PSEUDO_DEVICE_MEMORY_BUFFER) || (cursor < 0)) return -EINVAL;
+      pfile->f_pos += off;
+      break;
+    case SEEK_END:
+      cursor = PSEUDO_DEVICE_MEMORY_BUFFER + off;
+      if((cursor > PSEUDO_DEVICE_MEMORY_BUFFER) || (cursor < 0)) return -EINVAL;
+      pfile->f_pos = PSEUDO_DEVICE_MEMORY_BUFFER + off;
+      break;
+    default:
+      return -EINVAL;
+  }
+
+  return pfile->f_pos;
 }
 
 ssize_t _read(struct file *pfile, char __user *pbuff, size_t count, loff_t *poff)
 {
-  printk("executing %s, requested %zu bytes\n", __func__, count);
-  return 0;
+  pr_info("%s: executing %s, requested %zu bytes\n", MODULE_NAME, __func__, count);
+
+  if(pbuff == NULL || poff == NULL)
+  {
+    pr_err("%s: %s invalid parameters.\n", MODULE_NAME, __func__);
+    return -EINVAL;
+  }
+
+  if((*poff + count) > PSEUDO_DEVICE_MEMORY_BUFFER)
+  {
+    count = PSEUDO_DEVICE_MEMORY_BUFFER - *poff;
+  }
+
+  /*copy data to user (never ever believe on user buffer)*/
+  if(copy_to_user(pbuff, pseudo_device_buffer + *poff, count))
+  {
+    pr_err("%s: %s copy_to_user failed.\n", MODULE_NAME, __func__);
+    return -EFAULT;
+  }
+
+  /*update the current file position and return count*/
+  *poff += count;
+  return count;
 }
 
 ssize_t _write(struct file *pfile, const char __user *pbuff, size_t count, loff_t *poff)
 {
-  printk("executing %s, requested %zu bytes\n", __func__, count);
-  return 0;
+  pr_info("%s: executing %s, requested %zu bytes\n", MODULE_NAME, __func__, count);
+
+  if(pbuff == NULL || poff == NULL)
+  {
+    pr_err("%s: %s invalid parameters.\n", MODULE_NAME, __func__);
+    return -EINVAL;
+  }
+
+  if((*poff + count) > PSEUDO_DEVICE_MEMORY_BUFFER)
+  {
+    count = PSEUDO_DEVICE_MEMORY_BUFFER - *poff;
+  }
+
+  if(!count)
+  {
+    pr_err("%s: %s buffer full. no space available.\n", MODULE_NAME, __func__);
+    return -ENOMEM;
+  }
+
+  /*copy data to user (never ever believe on user buffer)*/
+  if(copy_from_user(pseudo_device_buffer + *poff, pbuff, count))
+  {
+    pr_err("%s: %s copy_to_user failed.\n", MODULE_NAME, __func__);
+    return -EFAULT;
+  }
+
+  /*update the current file position and return count*/
+  *poff += count;
+  return count;
 }
 
 int _open(struct inode *node, struct file *pfile)
 {
-  printk("executing %s\n", __func__);
+  pr_info("%s: executing %s\n", MODULE_NAME, __func__);
   return 0;
 }
 
 int _release(struct inode *pnode, struct file *pfile)
 {
-  printk("executing %s\n", __func__);
+  pr_info("%s: executing %s\n", MODULE_NAME, __func__);
   return 0;
 }
 
@@ -101,12 +173,12 @@ struct device *pdevice;
  */
 static int __init ModuleCharacterDeviceInit(void)
 {
-  printk("executing %s\n", __func__);
+  pr_info("%s: executing %s\n", MODULE_NAME, __func__);
 
   /*1. dynamically allocate a device number (creates device number)*/
   alloc_chrdev_region(&device_number, 0 /*first minor*/, 1 /*counts*/, "pdevice");
 
-  printk("%s device number <major>:<minor> = %d:%d\n", __func__,
+  pr_info("%s: %s device number <major>:<minor> = %d:%d\n", MODULE_NAME, __func__,
                                                       MAJOR(device_number),
                                                       MINOR(device_number));
 
@@ -134,7 +206,7 @@ static int __init ModuleCharacterDeviceInit(void)
   /*5. populate the sysfs with the device information*/
   pdevice = device_create(pdclass, NULL, device_number, NULL, "pdev");
 
-  printk("%s device created successfully..\n", __func__);
+  pr_info("%s: %s device created successfully..\n", MODULE_NAME, __func__);
   return 0;
 }
 
@@ -143,7 +215,7 @@ static int __init ModuleCharacterDeviceInit(void)
  */
 static void __exit ModuleCharacterDeviceExit(void)
 {
-  printk("executing %s\n", __func__);
+  pr_info("%s: executing %s\n", MODULE_NAME, __func__);
   
   /*cleanup task*/
   device_destroy(pdclass, device_number);
@@ -151,7 +223,7 @@ static void __exit ModuleCharacterDeviceExit(void)
   cdev_del(&pcdev);
   unregister_chrdev_region(device_number, 1);
 
-  printk("%s device cleaned up successfully..\n", __func__);
+  pr_info("%s: %s device cleaned up successfully..\n", MODULE_NAME, __func__);
 }
 
 module_init(ModuleCharacterDeviceInit);
