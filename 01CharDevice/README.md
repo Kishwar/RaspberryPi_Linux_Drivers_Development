@@ -177,8 +177,7 @@ Above command will open devshell. You will need to build LKM inside the window.
 
 ### 4. Load and output from RaspberryPi
 ```bash
-PS X:\home\kkumar\embd_linux\RaspberryPi_Linux_Drivers_Development\01CharDevice> scp char_device.ko root@192.168.178.98:/home/root/chardevice
-char_device.ko                                                                                                                                                                         100%   10KB 401.3KB/s   00:00 
+PS X:\home\kkumar\embd_linux\RaspberryPi_Linux_Drivers_Development\01CharDevice> scp char_device.ko root@192.168.178.98:/home/root/chardevice/char_device.ko    100%   10KB 401.3KB/s   00:00 
 ```
 ```plaintext
 root@raspberrypi3:~/chardevice# insmod char_device.ko
