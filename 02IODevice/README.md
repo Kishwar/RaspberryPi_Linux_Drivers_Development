@@ -65,3 +65,5 @@ root@raspberrypi3:~/chardevice# ./AppBlink
 Toggled /dev/pio 10 times.
 root@raspberrypi3:~/chardevice#
 ```
+
+[Watch the video](RaspberryPi_GPIO_Kernel_Module_User_Space_Test_Code.mp4)
