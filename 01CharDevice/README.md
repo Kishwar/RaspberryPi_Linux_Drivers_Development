@@ -169,3 +169,34 @@ bitbake virtual/kernel -c devshell
 Above command will open devshell. You will need to build LKM inside the window.
 
 ![devshell](make_make_clean_raspberrypi_cross_compilation.png)
+
+### 4. Load and output from RaspberryPI
+```bash
+PS X:\home\kkumar\embd_linux\RaspberryPi_Linux_Drivers_Development\01CharDevice> scp char_device.ko root@192.168.178.98:/home/root/chardevice
+char_device.ko                                                                                                                                                                         100%   10KB 401.3KB/s   00:00 
+```
+```plaintext
+root@raspberrypi3:~/chardevice# insmod char_device.ko
+root@raspberrypi3:~/chardevice# dmesg | tail
+....
+....
+[ 7347.081745] SINGLE_CHAR_DEVICE: executing ModuleCharacterDeviceInit
+[ 7347.088172] SINGLE_CHAR_DEVICE: ModuleCharacterDeviceInit device number <major>:<minor> = 241:0
+[ 7347.099777] SINGLE_CHAR_DEVICE: ModuleCharacterDeviceInit device created successfully..
+root@raspberrypi3:~/chardevice# ls /dev
+....
+hwrng         pdev          shm           tty2          tty38         tty56         vcs1          watchdog
+....
+root@raspberrypi3:~/chardevice# echo "test values" > /dev/pdev
+root@raspberrypi3:~/chardevice# dmesg | tail
+....
+[ 7881.766968] SINGLE_CHAR_DEVICE: executing _open
+[ 7881.771721] SINGLE_CHAR_DEVICE: executing _write, requested 12 bytes
+[ 7881.778597] SINGLE_CHAR_DEVICE: executing _release
+root@raspberrypi3:~/chardevice# echo "test values write them again" > /dev/pdev
+root@raspberrypi3:~/chardevice# dmesg | tail
+....
+[ 7909.892462] SINGLE_CHAR_DEVICE: executing _open
+[ 7909.897226] SINGLE_CHAR_DEVICE: executing _write, requested 29 bytes
+[ 7909.903701] SINGLE_CHAR_DEVICE: executing _release
+```
