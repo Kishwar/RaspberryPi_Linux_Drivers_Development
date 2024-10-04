@@ -4,7 +4,7 @@
 #include <fcntl.h>
 
 #define DEVICE_PATH "/dev/pio"
-#define SLEEP_DURATION 1000000 // Sleep duration in microseconds (1000,000 µs = 1 seconds)
+#define SLEEP_DURATION 1 // Sleep duration in seconds
 
 int main() {
     int fd;
@@ -26,7 +26,7 @@ int main() {
             close(fd);
             return EXIT_FAILURE;
         }
-        usleep(SLEEP_DURATION); // Sleep for 0.5 seconds
+        sleep(SLEEP_DURATION); // Sleep for 1 second
 
         // Write '0' to the device
         write_buffer[0] = '0';
@@ -35,7 +35,7 @@ int main() {
             close(fd);
             return EXIT_FAILURE;
         }
-        usleep(SLEEP_DURATION); // Sleep for 0.5 seconds
+        sleep(SLEEP_DURATION); // Sleep for 1 second
     }
 
     // Close the device file
