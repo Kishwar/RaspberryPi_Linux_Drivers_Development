@@ -119,11 +119,19 @@ ENABLE_UART = "1"
 EXTRA_IMAGE_FEATURES += " ssh-server-openssh"
 
 # Include Ethernet, SPI, and I2C tools
-IMAGE_INSTALL_append = " i2c-tools spi-tools python3-serial dhcp-client iproute2"
+IMAGE_INSTALL_append += " i2c-tools spi-tools python3-serial dhcp-client iproute2"
 
 # Add support for systemd
-DISTRO_FEATURES_append = " systemd"
+DISTRO_FEATURES += " systemd"
 VIRTUAL-RUNTIME_init_manager = "systemd"
+
+BB_GIT_CLONE_FOR_SRC_URI = "1"
+BB_FETCH_TIMEOUT = "60000"
+GIT_CONFIG[user.timeout] = "60000"
+BB_GIT_SHALLOW = "1"
+GIT_SHALLOW_pn-linux-raspberrypi = "1"
+BB_NUMBER_THREADS = "8"
+PARALLEL_MAKE = "-j8"
 ```
 
 4. To see available images:
@@ -138,7 +146,7 @@ ls ../meta-raspberrypi/recipes-*/images/
 
 ## 12. Build Image:
 ```bash
-bitbake rpi-hwup-image
+bitbake core-image-minimal
 ```
 
 ## 13. Raspberry Pi Information
@@ -159,7 +167,7 @@ bitbake rpi-hwup-image
 The built images can be found at:
 
 ```plaintext
-tmp/deploy/images/raspberrypi3
+tmp/deploy/images/raspberrypi3/core-image-minimal-raspberrypi3-20241004105158.rootfs.wic.bz2
 ```
 
 ## 16. IMAGE_ROOTFS_EXTRA_SPACE
