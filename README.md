@@ -119,7 +119,7 @@ ENABLE_UART = "1"
 EXTRA_IMAGE_FEATURES += " ssh-server-openssh"
 
 # Include Ethernet, SPI, and I2C tools
-IMAGE_INSTALL_append += " i2c-tools spi-tools python3-serial dhcp-client iproute2"
+IMAGE_INSTALL += " i2c-tools spi-tools python3-serial dhcp-client iproute2"
 
 # Add support for systemd
 DISTRO_FEATURES += " systemd"
