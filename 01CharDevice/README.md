@@ -1,4 +1,9 @@
-## Create a character device for both WSL2 (Host) and RaspberryPi (Cross-Compilation)
+## Create a character device for both WSL2 and RaspberryPi (Cross-Compilation)
+
+```bash
+kkumar@DESKTOP-NK9HSKR:/mnt/c/Users/kumar$ uname -a
+Linux DESKTOP-NK9HSKR 5.15.153.1-microsoft-standard-WSL2+ #2 SMP Thu Oct 3 10:36:07 CEST 2024 x86_64 x86_64 x86_64 GNU/Linux
+```
 
 ### Step 1: Compile for host
 ```bash
@@ -144,4 +149,59 @@ kkumar@DESKTOP-NK9HSKR:~/embd_linux/RaspberryPi_Linux_Drivers_Development/01Char
 [17693.518837] SINGLE_CHAR_DEVICE: executing _release
 [17713.568753] SINGLE_CHAR_DEVICE: executing ModuleCharacterDeviceExit
 [17713.568999] SINGLE_CHAR_DEVICE: ModuleCharacterDeviceExit device cleaned up successfully..
+```
+
+## Let's prepare enviroment for RaspberryPi (Cross-Compilation) on WSL2 (Host)
+
+[RaspberryPi build env setup on WSL2](https://github.com/Kishwar/RaspberryPi_Linux_Drivers_Development/blob/main/README.md)
+
+### 1. Build the Yocto Toolchain for the Raspberry Pi (if not already built)
+```bash
+bitbake meta-toolchain
+```
+
+### 2. Source the Toolchain Environment Script
+After building the toolchain, Yocto will generate a toolchain setup script (e.g., environment-setup-cortexa7t2hf-neon-vfpv4-poky-linux-gnueabi). This script sets up the necessary cross-compilation variables.
+```bash
+source tmp/sysroots/raspberrypi3/imgdata/core-image-minimal.env
+```
+
+### 3. Get the RaspberryPi Kernel Headers
+You need the kernel headers for your specific RaspberryPi kernel version. Use the Yocto build system to extract and set up the headers.
+```bash
+bitbake virtual/kernel -c devshell
+```
+Above command will open devshell. You will need to build LKM inside the window.
+
+![devshell](make_make_clean_raspberrypi_cross_compilation.png)
+
+### 4. Load and output from RaspberryPi
+```bash
+PS X:\home\kkumar\embd_linux\RaspberryPi_Linux_Drivers_Development\01CharDevice> scp char_device.ko root@192.168.178.98:/home/root/chardevice
+char_device.ko                                                                                                                                                                         100%   10KB 401.3KB/s   00:00 
+```
+```plaintext
+root@raspberrypi3:~/chardevice# insmod char_device.ko
+root@raspberrypi3:~/chardevice# dmesg | tail
+....
+....
+[ 7347.081745] SINGLE_CHAR_DEVICE: executing ModuleCharacterDeviceInit
+[ 7347.088172] SINGLE_CHAR_DEVICE: ModuleCharacterDeviceInit device number <major>:<minor> = 241:0
+[ 7347.099777] SINGLE_CHAR_DEVICE: ModuleCharacterDeviceInit device created successfully..
+root@raspberrypi3:~/chardevice# ls /dev
+....
+hwrng         pdev          shm           tty2          tty38         tty56         vcs1          watchdog
+....
+root@raspberrypi3:~/chardevice# echo "test values" > /dev/pdev
+root@raspberrypi3:~/chardevice# dmesg | tail
+....
+[ 7881.766968] SINGLE_CHAR_DEVICE: executing _open
+[ 7881.771721] SINGLE_CHAR_DEVICE: executing _write, requested 12 bytes
+[ 7881.778597] SINGLE_CHAR_DEVICE: executing _release
+root@raspberrypi3:~/chardevice# echo "test values write them again" > /dev/pdev
+root@raspberrypi3:~/chardevice# dmesg | tail
+....
+[ 7909.892462] SINGLE_CHAR_DEVICE: executing _open
+[ 7909.897226] SINGLE_CHAR_DEVICE: executing _write, requested 29 bytes
+[ 7909.903701] SINGLE_CHAR_DEVICE: executing _release
 ```

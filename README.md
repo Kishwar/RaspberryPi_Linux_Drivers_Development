@@ -24,7 +24,7 @@ git clone git://git.yoctoproject.org/poky (this really takes time)
 ## 3. Checkout the Latest Branch/Release
 ```bash
 cd poky
-git checkout zeus
+git checkout kirkstone
 ```
 
 ## 4. Add a Package to the Root File System
@@ -63,14 +63,14 @@ IMAGE_INSTALL_append = " usbutils"
 ```bash
 git clone git://git.yoctoproject.org/meta-raspberrypi
 cd meta-raspberrypi
-git checkout zeus
+git checkout kirkstone
 ```
 ### Dependencies
 - **meta-openembedded**: Required dependencies for the Raspberry Pi layer.
 ```bash
 git clone git://git.openembedded.org/meta-openembedded
 cd meta-openembedded
-git checkout zeus
+git checkout kirkstone
 ```
 
 ### Layers Needed:
@@ -94,16 +94,17 @@ source poky/oe-init-build-env build_pi
 ```
 
 2. Add `meta-openembedded` layers (meta-oe, meta-multimedia, meta-networking, meta-python) and the `meta-raspberrypi` layer to `build_pi/conf/bblayers.conf`.
-   ```plaintext
-   BBLAYERS ?= " \
+```bash
+  BBLAYERS ?= " \
   ${TOPDIR}/../poky/meta \
   ${TOPDIR}/../poky/meta-poky \
+  ${TOPDIR}/../poky/meta-yocto-bsp \
   ${TOPDIR}/../meta-openembedded/meta-oe \
   ${TOPDIR}/../meta-openembedded/meta-multimedia \
   ${TOPDIR}/../meta-openembedded/meta-networking \
   ${TOPDIR}/../meta-openembedded/meta-python \
   ${TOPDIR}/../meta-raspberrypi \
-"
+  "
 ```
 
 3. Configure local.conf for Raspberry Pi 3: Edit the build_pi/conf/local.conf file to set up the Raspberry Pi and enable UART, SPI, I2C, SSH, and Ethernet:
@@ -118,11 +119,19 @@ ENABLE_UART = "1"
 EXTRA_IMAGE_FEATURES += " ssh-server-openssh"
 
 # Include Ethernet, SPI, and I2C tools
-IMAGE_INSTALL_append = " i2c-tools spi-tools python3-serial dhcp-client iproute2"
+IMAGE_INSTALL += " i2c-tools spi-tools python3-serial dhcp-client iproute2"
 
 # Add support for systemd
-DISTRO_FEATURES_append = " systemd"
+DISTRO_FEATURES += " systemd"
 VIRTUAL-RUNTIME_init_manager = "systemd"
+
+BB_GIT_CLONE_FOR_SRC_URI = "1"
+BB_FETCH_TIMEOUT = "60000"
+GIT_CONFIG[user.timeout] = "60000"
+BB_GIT_SHALLOW = "1"
+GIT_SHALLOW_pn-linux-raspberrypi = "1"
+BB_NUMBER_THREADS = "8"
+PARALLEL_MAKE = "-j8"
 ```
 
 4. To see available images:
@@ -137,7 +146,7 @@ ls ../meta-raspberrypi/recipes-*/images/
 
 ## 12. Build Image:
 ```bash
-bitbake rpi-hwup-image
+bitbake core-image-minimal
 ```
 
 ## 13. Raspberry Pi Information
@@ -158,7 +167,7 @@ bitbake rpi-hwup-image
 The built images can be found at:
 
 ```plaintext
-tmp/deploy/images/raspberrypi3
+tmp/deploy/images/raspberrypi3/core-image-minimal-raspberrypi3-20241004105158.rootfs.wic.bz2
 ```
 
 ## 16. IMAGE_ROOTFS_EXTRA_SPACE
