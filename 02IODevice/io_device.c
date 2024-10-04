@@ -1,21 +1,20 @@
 /************************************************************
- *  char_driver.c - Simple Linux Kernel Pseudo Character Driver
+ *  io_driver.c - Simple Linux Kernel IO LED Driver
  *
  *  Description:
- *      This is a basic Linux kernel pseudo character device driver.
- *      The driver implements open, close, read, write, and lseek operations.
+ *      This is a basic Linux kernel io led device driver.
+ *      The driver implements turning on / off features
  *      It can be used as a template for developing more complex
- *      character drivers.
+ *      character io drivers.
  *
  *  Functionality:
- *      - Registers a character device with the kernel.
- *      - Implements open, release (close), read, write, and lseek operations.
+ *      - Registers a character device (io) with the kernel.
+ *      - Implements write with turn on / off / toggle feature
  *
  *  Usage:
  *      - To compile: `make`
- *      - To load: `sudo insmod char_driver.ko`
- *      - To create a device node: `sudo mknod /dev/simple_char c <major> 0`
- *      - To remove: `sudo rmmod char_driver`
+ *      - To load: `sudo insmod io_driver.ko`
+ *      - To remove: `sudo rmmod io_driver`
  *
  *  License:
  *      This source code is licensed under the GPL License.
@@ -30,18 +29,14 @@
 #include <linux/fs.h>
 #include <linux/cdev.h>
 #include <linux/device.h>
-
+#include <linux/gpio.h>
 
 /* meta information */
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Kishwar Kumar");
-MODULE_DESCRIPTION("This is a basic Linux kernel pseudo character device driver.");
+MODULE_DESCRIPTION("This is a basic Linux kernel character device driver for io operation.");
 
-#define MODULE_NAME "SINGLE_CHAR_DEVICE"
-
-/* lets create a memory buffer on which we will do operations */
-#define PSEUDO_DEVICE_MEMORY_BUFFER 512
-char pseudo_device_buffer[PSEUDO_DEVICE_MEMORY_BUFFER];
+#define MODULE_NAME "SINGLE_CHAR_IO_DEVICE"
 
 /* lets store device number */
 dev_t device_number;
@@ -49,65 +44,11 @@ dev_t device_number;
 /*cdev variable*/
 struct cdev pcdev;
 
-/*-------------------------------------------------------------------*/
-/*define global functions*/
-loff_t _lseek(struct file *pfile, loff_t off, int whence)
-{
-  loff_t cursor;
-  pr_info("%s: executing %s\n", MODULE_NAME, __func__);
-
-  switch(whence)
-  {
-    case SEEK_SET:
-      if((off > PSEUDO_DEVICE_MEMORY_BUFFER) || (off < 0)) return -EINVAL;
-      pfile->f_pos = off;
-      break;
-    case SEEK_CUR:
-      cursor = pfile->f_pos + off;
-      if((cursor > PSEUDO_DEVICE_MEMORY_BUFFER) || (cursor < 0)) return -EINVAL;
-      pfile->f_pos += off;
-      break;
-    case SEEK_END:
-      cursor = PSEUDO_DEVICE_MEMORY_BUFFER + off;
-      if((cursor > PSEUDO_DEVICE_MEMORY_BUFFER) || (cursor < 0)) return -EINVAL;
-      pfile->f_pos = PSEUDO_DEVICE_MEMORY_BUFFER + off;
-      break;
-    default:
-      return -EINVAL;
-  }
-
-  return pfile->f_pos;
-}
-
-ssize_t _read(struct file *pfile, char __user *pbuff, size_t count, loff_t *poff)
-{
-  pr_info("%s: executing %s, requested %zu bytes\n", MODULE_NAME, __func__, count);
-
-  if(pbuff == NULL || poff == NULL)
-  {
-    pr_err("%s: %s invalid parameters.\n", MODULE_NAME, __func__);
-    return -EINVAL;
-  }
-
-  if((*poff + count) > PSEUDO_DEVICE_MEMORY_BUFFER)
-  {
-    count = PSEUDO_DEVICE_MEMORY_BUFFER - *poff;
-  }
-
-  /*copy data to user (never ever believe on user buffer)*/
-  if(copy_to_user(pbuff, pseudo_device_buffer + *poff, count))
-  {
-    pr_err("%s: %s copy_to_user failed.\n", MODULE_NAME, __func__);
-    return -EFAULT;
-  }
-
-  /*update the current file position and return count*/
-  *poff += count;
-  return count;
-}
-
 ssize_t _write(struct file *pfile, const char __user *pbuff, size_t count, loff_t *poff)
 {
+  char value;
+  int to_copy, not_copied, delta;
+
   pr_info("%s: executing %s, requested %zu bytes\n", MODULE_NAME, __func__, count);
 
   if(pbuff == NULL || poff == NULL)
@@ -116,27 +57,30 @@ ssize_t _write(struct file *pfile, const char __user *pbuff, size_t count, loff_
     return -EINVAL;
   }
 
-  if((*poff + count) > PSEUDO_DEVICE_MEMORY_BUFFER)
-  {
-    count = PSEUDO_DEVICE_MEMORY_BUFFER - *poff;
-  }
+  /*get size of data to copy*/
+  to_copy = min(count, sizeof(value));
 
-  if(!count)
-  {
-    pr_err("%s: %s buffer full. no space available.\n", MODULE_NAME, __func__);
-    return -ENOMEM;
-  }
+  /*copy user data*/
+  not_copied = copy_from_user(&value, pbuff, to_copy);
 
-  /*copy data to user (never ever believe on user buffer)*/
-  if(copy_from_user(pseudo_device_buffer + *poff, pbuff, count))
+  /*setting the LED*/
+  switch(value)
   {
-    pr_err("%s: %s copy_to_user failed.\n", MODULE_NAME, __func__);
-    return -EFAULT;
-  }
+    case '0':
+      gpio_set_value(4, 0);
+      break;
+    case '1':
+      gpio_set_value(4, 1);
+      break;
+    default:
+      pr_err("%s: %s invalid value.\n", MODULE_NAME, __func__);
+      break;
+  } 
 
-  /*update the current file position and return count*/
-  *poff += count;
-  return count;
+  /*calculate delta*/
+  delta = to_copy - not_copied;
+
+  return delta;
 }
 
 int _open(struct inode *node, struct file *pfile)
@@ -156,14 +100,12 @@ struct file_operations pcfops =
 {
   .open    = _open,
   .write   = _write,
-  .read    = _read,
-  .llseek  = _lseek,
+  .read    = NULL,
   .release = _release,
   .owner   = THIS_MODULE
 };
 
 struct class *pdclass;
-
 struct device *pdevice;
 
 /*-------------------------------------------------------------------*/
@@ -176,7 +118,7 @@ static int __init ModuleCharacterDeviceInit(void)
   pr_info("%s: executing %s\n", MODULE_NAME, __func__);
 
   /*1. dynamically allocate a device number (creates device number)*/
-  if(alloc_chrdev_region(&device_number, 0 /*first minor*/, 1 /*counts*/, "pdevice") < 0)
+  if(alloc_chrdev_region(&device_number, 0 /*first minor*/, 1 /*counts*/, "iodevice") < 0)
   {
     pr_err("%s: %s Failed to allocate a major number\n", MODULE_NAME, __func__);
     return -1;
@@ -198,7 +140,7 @@ static int __init ModuleCharacterDeviceInit(void)
   */
  
   /*2. create device class under /sys/class/ */
-  pdclass = class_create(THIS_MODULE, "pdevclass");
+  pdclass = class_create(THIS_MODULE, "iodevclass");
   if (IS_ERR(pdclass))
   {
     unregister_chrdev_region(device_number, 1);
@@ -207,7 +149,7 @@ static int __init ModuleCharacterDeviceInit(void)
   }
 
   /*3. Create the device file in /dev and set the permissions to 0666 */
-  pdevice = device_create(pdclass, NULL, device_number, NULL, "pdev");
+  pdevice = device_create(pdclass, NULL, device_number, NULL, "pio");
   if(pdevice == NULL)
   {
     class_destroy(pdclass);
@@ -230,6 +172,27 @@ static int __init ModuleCharacterDeviceInit(void)
     return -1;
   }
 
+  /*6. Init GPIO4 - Connected with LED*/
+  if(gpio_request(4, "rpi-gpio-4"))
+  {
+    device_destroy(pdclass, device_number);
+    class_destroy(pdclass);
+    unregister_chrdev_region(device_number, 1);
+    pr_err("%s: %s Failed to allocate GPIO 4\n", MODULE_NAME, __func__);
+    return -1;
+  }
+
+  /*7. Set the direction of the PIN*/
+  if(gpio_direction_output(4, 0))
+  {
+    device_destroy(pdclass, device_number);
+    class_destroy(pdclass);
+    unregister_chrdev_region(device_number, 1);
+    gpio_free(4);
+    pr_err("%s: %s Can not set GPIO 4 to out\n", MODULE_NAME, __func__);
+    return -1;
+  }
+
   pr_info("%s: %s device created successfully..\n", MODULE_NAME, __func__);
   return 0;
 }
@@ -246,7 +209,8 @@ static void __exit ModuleCharacterDeviceExit(void)
   class_destroy(pdclass);
   cdev_del(&pcdev);
   unregister_chrdev_region(device_number, 1);
-
+  gpio_set_value(4, 0);
+  gpio_free(4);
   pr_info("%s: %s device cleaned up successfully..\n", MODULE_NAME, __func__);
 }
 
