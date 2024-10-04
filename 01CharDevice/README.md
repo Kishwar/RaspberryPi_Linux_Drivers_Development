@@ -1,4 +1,9 @@
-## Create a character device for both WSL2 (Host) and RaspberryPi (Cross-Compilation)
+## Create a character device for both WSL2 and RaspberryPi (Cross-Compilation)
+
+```bash
+kkumar@DESKTOP-NK9HSKR:/mnt/c/Users/kumar$ uname -a
+Linux DESKTOP-NK9HSKR 5.15.153.1-microsoft-standard-WSL2+ #2 SMP Thu Oct 3 10:36:07 CEST 2024 x86_64 x86_64 x86_64 GNU/Linux
+```
 
 ### Step 1: Compile for host
 ```bash
@@ -146,7 +151,7 @@ kkumar@DESKTOP-NK9HSKR:~/embd_linux/RaspberryPi_Linux_Drivers_Development/01Char
 [17713.568999] SINGLE_CHAR_DEVICE: ModuleCharacterDeviceExit device cleaned up successfully..
 ```
 
-## Let's prepare enviroment for RaspberryPi (Cross-Compilation)
+## Let's prepare enviroment for RaspberryPi (Cross-Compilation) on WSL2 (Host)
 
 [RaspberryPi build env setup on WSL2](https://github.com/Kishwar/RaspberryPi_Linux_Drivers_Development/blob/main/README.md)
 
@@ -170,7 +175,7 @@ Above command will open devshell. You will need to build LKM inside the window.
 
 ![devshell](make_make_clean_raspberrypi_cross_compilation.png)
 
-### 4. Load and output from RaspberryPI
+### 4. Load and output from RaspberryPi
 ```bash
 PS X:\home\kkumar\embd_linux\RaspberryPi_Linux_Drivers_Development\01CharDevice> scp char_device.ko root@192.168.178.98:/home/root/chardevice
 char_device.ko                                                                                                                                                                         100%   10KB 401.3KB/s   00:00 
