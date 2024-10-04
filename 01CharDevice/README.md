@@ -161,10 +161,11 @@ After building the toolchain, Yocto will generate a toolchain setup script (e.g.
 source tmp/sysroots/raspberrypi3/imgdata/core-image-minimal.env
 ```
 
-### 3. Get the Raspberry Pi Kernel Headers
-You need the kernel headers for your specific Raspberry Pi kernel version. Use the Yocto build system to extract and set up the headers.
+### 3. Get the RaspberryPi Kernel Headers
+You need the kernel headers for your specific RaspberryPi kernel version. Use the Yocto build system to extract and set up the headers.
 ```bash
-
+bitbake virtual/kernel -c devshell
 ```
+Above command will open devshell. You will need to build LKM inside the window.
 
 
