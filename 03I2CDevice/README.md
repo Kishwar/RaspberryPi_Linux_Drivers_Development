@@ -24,7 +24,7 @@ bitbake virtual/kernel -c devshell
 ```
 Above command will open devshell. You will need to build LKM inside the window.
 
-![devshell](make_make_clean_raspberrypi_cross_compilation_gpio.png)
+![devshell](make_make_clean_raspberrypi_cross_compilation_i2c_device.png)
 
 ### 4. Load and output from RaspberryPi
 ```bash
