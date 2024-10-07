@@ -24,24 +24,22 @@
  *      Your Name (kumar.kishwar@gmail.com)
  *      Date: October 2024
  ************************************************************/
-
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/fs.h>
 #include <linux/cdev.h>
 #include <linux/device.h>
-
+#include <linux/slab.h>
+#include <linux/i2c.h>
 
 /* meta information */
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Kishwar Kumar");
-MODULE_DESCRIPTION("This is a basic Linux kernel pseudo character device driver.");
+MODULE_DESCRIPTION("This is a basic Linux kernel drivers for i2c connecting BMP280.");
 
-#define MODULE_NAME "SINGLE_CHAR_DEVICE"
+static int32_t  read_temperature(void);
 
-/* lets create a memory buffer on which we will do operations */
-#define PSEUDO_DEVICE_MEMORY_BUFFER 512
-char pseudo_device_buffer[PSEUDO_DEVICE_MEMORY_BUFFER];
+#define MODULE_NAME "SINGLE_CHAR_I2C_DEVICE"
 
 /* lets store device number */
 dev_t device_number;
@@ -49,38 +47,40 @@ dev_t device_number;
 /*cdev variable*/
 struct cdev pcdev;
 
+static struct i2c_adapter *bmp_i2c_adapter = NULL;
+static struct i2c_client *bmp280_i2c_client = NULL;
+
+/* Defines for device identification */ 
+#define I2C_BUS_AVAILABLE	1	         	/* The I2C Bus available on the raspberry */
+#define SLAVE_DEVICE_NAME	"BMP280"	  /* Device and Driver Name */
+#define BMP280_SLAVE_ADDRESS	0x76		/* BMP280 I2C address */
+
+/* Variables for temperature calculation */
+int32_t dig_T1, dig_T2, dig_T3;
+
+static const struct i2c_device_id bmp_id[] = {
+  { SLAVE_DEVICE_NAME, 0 }, 
+  { }
+};
+
+static struct i2c_driver bmp_driver = {
+	.driver = {
+		.name = SLAVE_DEVICE_NAME,
+		.owner = THIS_MODULE
+	}
+};
+
+static struct i2c_board_info bmp_i2c_board_info = {
+	I2C_BOARD_INFO(SLAVE_DEVICE_NAME, BMP280_SLAVE_ADDRESS)
+};
+
 /*-------------------------------------------------------------------*/
 /*define global functions*/
-loff_t _lseek(struct file *pfile, loff_t off, int whence)
-{
-  loff_t cursor;
-  pr_info("%s: executing %s\n", MODULE_NAME, __func__);
-
-  switch(whence)
-  {
-    case SEEK_SET:
-      if((off > PSEUDO_DEVICE_MEMORY_BUFFER) || (off < 0)) return -EINVAL;
-      pfile->f_pos = off;
-      break;
-    case SEEK_CUR:
-      cursor = pfile->f_pos + off;
-      if((cursor > PSEUDO_DEVICE_MEMORY_BUFFER) || (cursor < 0)) return -EINVAL;
-      pfile->f_pos += off;
-      break;
-    case SEEK_END:
-      cursor = PSEUDO_DEVICE_MEMORY_BUFFER + off;
-      if((cursor > PSEUDO_DEVICE_MEMORY_BUFFER) || (cursor < 0)) return -EINVAL;
-      pfile->f_pos = PSEUDO_DEVICE_MEMORY_BUFFER + off;
-      break;
-    default:
-      return -EINVAL;
-  }
-
-  return pfile->f_pos;
-}
-
 ssize_t _read(struct file *pfile, char __user *pbuff, size_t count, loff_t *poff)
 {
+  int32_t tmp;
+  int to_copy, not_copied;
+
   pr_info("%s: executing %s, requested %zu bytes\n", MODULE_NAME, __func__, count);
 
   if(pbuff == NULL || poff == NULL)
@@ -89,54 +89,22 @@ ssize_t _read(struct file *pfile, char __user *pbuff, size_t count, loff_t *poff
     return -EINVAL;
   }
 
-  if((*poff + count) > PSEUDO_DEVICE_MEMORY_BUFFER)
+  /* get temporature */
+  tmp = read_temperature();
+
+  /* get size of data to copy */
+  to_copy = min(count, sizeof(tmp));
+
+  /*copy user data*/
+  not_copied = copy_to_user(pbuff, &tmp, to_copy);
+
+  if(not_copied != 0)
   {
-    count = PSEUDO_DEVICE_MEMORY_BUFFER - *poff;
+    pr_err("%s: %s unable to copy data to user space.\n", MODULE_NAME, __func__);
+    return EFAULT;
   }
 
-  /*copy data to user (never ever believe on user buffer)*/
-  if(copy_to_user(pbuff, pseudo_device_buffer + *poff, count))
-  {
-    pr_err("%s: %s copy_to_user failed.\n", MODULE_NAME, __func__);
-    return -EFAULT;
-  }
-
-  /*update the current file position and return count*/
-  *poff += count;
-  return count;
-}
-
-ssize_t _write(struct file *pfile, const char __user *pbuff, size_t count, loff_t *poff)
-{
-  pr_info("%s: executing %s, requested %zu bytes\n", MODULE_NAME, __func__, count);
-
-  if(pbuff == NULL || poff == NULL)
-  {
-    pr_err("%s: %s invalid parameters.\n", MODULE_NAME, __func__);
-    return -EINVAL;
-  }
-
-  if((*poff + count) > PSEUDO_DEVICE_MEMORY_BUFFER)
-  {
-    count = PSEUDO_DEVICE_MEMORY_BUFFER - *poff;
-  }
-
-  if(!count)
-  {
-    pr_err("%s: %s buffer full. no space available.\n", MODULE_NAME, __func__);
-    return -ENOMEM;
-  }
-
-  /*copy data to user (never ever believe on user buffer)*/
-  if(copy_from_user(pseudo_device_buffer + *poff, pbuff, count))
-  {
-    pr_err("%s: %s copy_to_user failed.\n", MODULE_NAME, __func__);
-    return -EFAULT;
-  }
-
-  /*update the current file position and return count*/
-  *poff += count;
-  return count;
+  return to_copy - not_copied;
 }
 
 int _open(struct inode *node, struct file *pfile)
@@ -155,24 +123,46 @@ int _release(struct inode *pnode, struct file *pfile)
 struct file_operations pcfops =
 {
   .open    = _open,
-  .write   = _write,
   .read    = _read,
-  .llseek  = _lseek,
   .release = _release,
   .owner   = THIS_MODULE
 };
 
 struct class *pdclass;
-
 struct device *pdevice;
 
 /*-------------------------------------------------------------------*/
 /*define static functions*/
-/*
+/*-------------------------------------------------------------------*/
+/**
+ * @brief Read current temperature from BMP280 sensor
+ * @return temperature in degree
+ */
+static int32_t  read_temperature(void) {
+	int32_t  var1, var2;
+	int32_t  raw_temp;
+	int32_t  d1, d2, d3;
+
+	/* Read Temperature */
+	d1 = i2c_smbus_read_byte_data(bmp280_i2c_client, 0xFA);
+	d2 = i2c_smbus_read_byte_data(bmp280_i2c_client, 0xFB);
+	d3 = i2c_smbus_read_byte_data(bmp280_i2c_client, 0xFC);
+	raw_temp = ((d1<<16) | (d2<<8) | d3) >> 4;
+
+	/* Calculate temperature in degree */
+	var1 = ((((raw_temp >> 3) - (dig_T1 << 1))) * (dig_T2)) >> 11;
+
+	var2 = (((((raw_temp >> 4) - (dig_T1)) * ((raw_temp >> 4) - (dig_T1))) >> 12) * (dig_T3)) >> 14;
+	return ((var1 + var2) *5 +128) >> 8;
+}
+
+/**
  * @brief this function is called, when the module is loaded into the kernel
+ * @return 0 when module init OK, non-zero otherwise
  */
 static int __init ModuleCharacterDeviceInit(void)
 {
+	u8 id;
   pr_info("%s: executing %s\n", MODULE_NAME, __func__);
 
   /*1. dynamically allocate a device number (creates device number)*/
@@ -230,7 +220,63 @@ static int __init ModuleCharacterDeviceInit(void)
     return -1;
   }
 
+  bmp_i2c_adapter = i2c_get_adapter(I2C_BUS_AVAILABLE);
+  if(bmp_i2c_adapter == NULL)
+  {
+    device_destroy(pdclass, device_number);
+    class_destroy(pdclass);
+    unregister_chrdev_region(device_number, 1);
+    pr_info("%s: %s unable to get i2c adaptor...\n", MODULE_NAME, __func__);
+    return -1;
+  }
+
+  bmp280_i2c_client = i2c_new_client_device(bmp_i2c_adapter, &bmp_i2c_board_info);
+  if(bmp280_i2c_client == NULL)
+  {
+    device_destroy(pdclass, device_number);
+    class_destroy(pdclass);
+    unregister_chrdev_region(device_number, 1);
+    pr_info("%s: %s unable to get i2c device...\n", MODULE_NAME, __func__);
+    return -1;
+  }
+
+  if(i2c_add_driver(&bmp_driver) == -1)
+  {
+    device_destroy(pdclass, device_number);
+    class_destroy(pdclass);
+    unregister_chrdev_region(device_number, 1);
+    i2c_unregister_device(bmp280_i2c_client);
+    pr_info("%s: %s Can't add driver...\n", MODULE_NAME, __func__);
+    return -1;
+  }
+
+  pr_info("%s: %s BMP280 Driver added!\n", MODULE_NAME, __func__);
+
+  if (bmp280_i2c_client == NULL)
+  {
+    pr_err("%s: %s I2C client not initialized properly\n", MODULE_NAME, __func__);
+    return -ENODEV;
+  }
+
+	/* Read Chip ID */
+	id = i2c_smbus_read_byte_data(bmp280_i2c_client, 0xD0);
+	pr_info("%s: %s ID: 0x%x\n", MODULE_NAME, __func__, id);
+
+	/* Read Calibration Values */
+  dig_T1 = i2c_smbus_read_word_data(bmp280_i2c_client, 0x88);
+  dig_T2 = i2c_smbus_read_word_data(bmp280_i2c_client, 0x8a);
+  dig_T3 = i2c_smbus_read_word_data(bmp280_i2c_client, 0x8c);
+
+  if(dig_T2 > 32767) dig_T2 -= 65536;
+
+	if(dig_T3 > 32767) dig_T3 -= 65536;
+
+	/* Initialice the sensor */
+  i2c_smbus_write_byte_data(bmp280_i2c_client, 0xf5, 5<<5);
+  i2c_smbus_write_byte_data(bmp280_i2c_client, 0xf4, ((5<<5) | (5<<2) | (3<<0)));
+
   pr_info("%s: %s device created successfully..\n", MODULE_NAME, __func__);
+
   return 0;
 }
 
@@ -242,6 +288,9 @@ static void __exit ModuleCharacterDeviceExit(void)
   pr_info("%s: executing %s\n", MODULE_NAME, __func__);
   
   /*cleanup task*/
+  i2c_put_adapter(bmp_i2c_adapter);
+  i2c_unregister_device(bmp280_i2c_client);
+	i2c_del_driver(&bmp_driver);
   device_destroy(pdclass, device_number);
   class_destroy(pdclass);
   cdev_del(&pcdev);
